@@ -203,10 +203,10 @@ L'application est ensuite disponible sur <http://localhost:8501>.
 
 ## 10. Liens utiles
 
-- Formulaire de candidature : <https://e-telecom-soft.com/>
+- Formulaire de candidature : lien retirer - image capture (formulaire-candidature.png)
 - [Fichier de suivi des candidatures (Google Sheets)](https://docs.google.com/spreadsheets/d/1XCmiAU6BNcPe7IN2KXMVziPHHXxINVpQF0UAP83z42Y/edit?usp=drive_link)
 - [Dossier de dépôt des CV (Google Drive)](https://drive.google.com/drive/u/0/folders/1mY0eP-OizQY4ltrKBTddfDuobw8AOSiA)
 
 ---
 
-*Projet RPA · MBA ESG Paris · Septembre 2026*
+*Projet RPA · MBA ESG Paris · Juin 2026*
