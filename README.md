@@ -12,9 +12,9 @@ Dépôt driver : https://drive.google.com/file/d/1CeCXKMCL3u2sQhO6XZKH5t8RCf9v2O
 
 | Nom | Rôle |
 |---|---|
+| Eric DONYOH | Data Engeneer |
 | Antoine Mekawy | Projet RPA |
 | Sofiane EL MORABIT | Automatisation · RPA |
-| Eric DONYOH | MBA ESG – Big Data & Intelligence Artificielle (MBDIA) |
 
 ## Sommaire
 
