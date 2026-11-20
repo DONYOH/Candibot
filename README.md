@@ -6,6 +6,8 @@ Projet RPA · MBA ESG Paris · MBA2 BDIA Janv26 – Classe 01 · Septembre 2026
 
 ![Couverture CandiBot](assets/slide-01-couverture.png)
 
+Dépôt driver : https://drive.google.com/file/d/1CeCXKMCL3u2sQhO6XZKH5t8RCf9v2OCj/view?usp=sharing
+
 ## Équipe
 
 | Nom | Rôle |
@@ -70,7 +72,7 @@ En cas d'exception, une personne reprend la main.
 
 **CandiBot** est un robot *unattended* de traitement des candidatures, développé avec **UiPath Studio Web**.
 
-Quand une candidature arrive via [e-telecom-soft.com](https://e-telecom-soft.com), CandiBot :
+Quand une candidature arrive via nom_domaine.com, CandiBot :
 
 1. récupère les informations principales de l'e-mail (nom, adresse e-mail, poste recherché) ;
 2. les ajoute automatiquement dans le fichier de suivi ;
