@@ -1,186 +1,212 @@
-# 🤖 CandiBot — Automatisation RPA de Collecte et Centralisation de CV
+# 🤖 CandiBot
 
-![UiPath](https://img.shields.io/badge/UiPath-Automation%20Cloud-FA4616?style=for-the-badge&logo=uipath&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge)
-![Architecture](https://img.shields.io/badge/Architecture-Serverless%20%2F%20Cloud-blue?style=for-the-badge)
+**Automatisation du traitement des candidatures par e-mail (RPA)**
 
-## 📋 Table des matières
-1. [Présentation du projet](#-présentation-du-projet)
-2. [Problématique et valeur ajoutée](#-problématique-et-valeur-ajoutée)
-3. [Architecture technique et flux de données](#-architecture-technique-et-flux-de-données)
-4. [Prérequis et dépendances](#-prérequis-et-dépendances)
-5. [Configuration sur UiPath Automation Cloud](#-configuration-sur-uipath-automation-cloud)
-6. [Détail du Workflow (UiPath Studio)](#-détail-du-workflow-uipath-studio)
-7. [Structure du projet](#-structure-du-projet)
-8. [Déploiement et exécution](#-déploiement-et-exécution)
-9. [Gestion des erreurs et bonnes pratiques](#-gestion-des-erreurs-et-bonnes-pratiques)
-10. [Évolutions futures (Roadmap)](#-évolutions-futures-roadmap)
-11. [Auteur](#-auteur)
+Projet RPA · MBA ESG Paris · MBA2 BDIA Janv26 – Classe 01 · Septembre 2026
 
----
+![Couverture CandiBot](assets/slide-01-couverture.png)
 
-## 🎯 Présentation du projet
+## Équipe
 
-**CandiBot** est un robot d'automatisation des processus métier (RPA) développé sous **UiPath Studio** et conçu pour s'exécuter de manière 100 % autonome dans un environnement **UiPath Automation Cloud (Serverless / Unattended)**.
+| Nom | Rôle |
+|---|---|
+| Antoine Mekawy | Projet RPA |
+| Sofiane EL MORABIT | Automatisation · RPA |
+| Eric DONYOH | MBA ESG – Big Data & Intelligence Artificielle (MBDIA) |
 
-Son rôle principal est d'automatiser la réception, le filtrage, le renommage standardisé et l'archivage centralisé des candidatures reçues par e-mail (Gmail) directement vers un espace de stockage sécurisé sur **UiPath Orchestrator** (*Storage Bucket*).
+## Sommaire
 
----
-
-## 💡 Problématique et valeur ajoutée
-
-Le traitement manuel des candidatures par e-mail présente plusieurs goulots d'étranglement :
-* **Perte de temps** liée à l'ouverture unitaire des e-mails et au téléchargement des pièces jointes.
-* **Risque d'écrasement ou de perte** lorsque plusieurs candidats nomment leur fichier `CV.pdf`.
-* **Dépendance aux postes locaux** rendant le partage des CV difficile entre les recruteurs et les équipes Data/RH.
-
-**Ce que CandiBot apporte :**
-* **Zéro intervention humaine** : Surveillance continue ou planifiée de la boîte de réception.
-* **Standardisation** : Renommage automatique incluant l'adresse de l'expéditeur (`<email>_<nom_fichier>.pdf`).
-* **Indépendance matérielle** : Aucune dépendance à un disque dur local (`C:\`), exécution native sur conteneurs Cloud éphémères.
+1. [Le problème actuel](#1-le-problème-actuel)
+2. [Diagramme de flux](#2-diagramme-de-flux)
+3. [La solution CandiBot](#3-la-solution-candibot)
+4. [Démonstration du prototype](#4-démonstration-du-prototype)
+5. [Bénéfices attendus](#5-bénéfices-attendus)
+6. [Cas d'intervention humaine](#6-cas-dintervention-humaine)
+7. [Prototype et ressources](#7-prototype-et-ressources)
+8. [Planning et ROI](#8-planning-et-roi)
+9. [Lancer le dashboard](#9-lancer-le-dashboard)
+10. [Liens utiles](#10-liens-utiles)
 
 ---
 
-## 🏗️ Architecture technique et flux de données
+## 1. Le problème actuel
 
-L'architecture repose sur un transit en mémoire temporaire au sein du conteneur d'exécution Cloud avant le transfert définitif vers l'Orchestrator :
+Les candidatures arrivent directement par e-mail. Pour chaque nouvelle candidature, une personne doit :
 
-```text
-┌─────────────────────────────┐
-│      Boîte Gmail Cible      │
-│   (Integration Service)     │
-└──────────────┬──────────────┘
-               │  1. Lecture des e-mails (CurrentEmail)
-               ▼
-┌─────────────────────────────┐
-│  Download Email Attachments │
-│     Filtre : "*.pdf"        │
-└──────────────┬──────────────┘
-               │  2. Extraction vers la zone de transit
-               ▼
-┌─────────────────────────────┐
-│  Système de fichiers Cloud  │
-│ System.IO.Path.GetTempPath()│
-└──────────────┬──────────────┘
-               │  3. Lecture via Attachments(0).LocalPath
-               ▼
-┌─────────────────────────────┐
-│     Upload Storage File     │
-│ Renommage : From + "_" + CV │
-└──────────────┬──────────────┘
-               │  4. Stockage persistant
-               ▼
-┌─────────────────────────────┐
-│    UiPath Orchestrator      │
-│ Storage Bucket: CV_Candidates│
-└─────────────────────────────┘
+- ouvrir le message et télécharger le CV ;
+- relever les informations principales du candidat et les reporter dans un fichier de suivi ;
+- ranger le CV dans le bon dossier ;
+- répondre au candidat pour confirmer la réception.
+
+Ce traitement prend environ **5 minutes par candidature**. Les difficultés au quotidien :
+
+- du temps passé sur des tâches simples et répétitives ;
+- des erreurs de saisie (mauvaise adresse, mauvais fichier) ;
+- une candidature non enregistrée peut être oubliée ;
+- une réponse tardive si le recruteur est indisponible.
+
+![Le problème actuel](assets/slide-03-probleme.png)
+
+## 2. Diagramme de flux
+
+Déclencheur : réception d'un e-mail de candidature. Le flux suit ensuite quatre étapes standardisées :
+
+```
+Réception e-mail → Lecture → Classement CV → Mise à jour du suivi → Confirmation
 ```
 
----
+| # | Étape | Action |
+|---|---|---|
+| 1 | Lecture de l'e-mail | Ouvrir le message, lire le nom du candidat, son adresse et le poste recherché |
+| 2 | CV et classement | Télécharger le CV joint et l'enregistrer dans le bon dossier |
+| 3 | Mise à jour du suivi | Ajouter une ligne au fichier de suivi et remplir les informations du candidat |
+| 4 | Confirmation | Envoyer une réponse au candidat pour accuser réception |
 
-## ⚙️ Prérequis et dépendances
+En cas d'exception, une personne reprend la main.
 
-### Environnement logiciel
-* **UiPath Studio** (version 2023.10 ou supérieure, compatibilité *Windows* ou *Cross-Platform*).
-* Accès à un tenant **UiPath Automation Cloud** avec licence d'exécution *Serverless* ou *Unattended*.
+![Diagramme de flux du processus](assets/slide-04-diagramme-de-flux.png)
 
-### Packages NuGet requis
-| Package | Version recommandée | Rôle dans le projet |
-| :--- | :--- | :--- |
-| `UiPath.GSuite.Activities` | `>= 2.6.0` | Interaction avec l'API Gmail via Integration Service. |
-| `UiPath.System.Activities` | `>= 23.10.0` | Gestion des variables, boucles et activités *Storage Bucket*. |
+## 3. La solution CandiBot
 
----
+**CandiBot** est un robot *unattended* de traitement des candidatures, développé avec **UiPath Studio Web**.
 
-## ☁️ Configuration sur UiPath Automation Cloud
+Quand une candidature arrive via [e-telecom-soft.com](https://e-telecom-soft.com), CandiBot :
 
-Avant d'exécuter le robot, deux ressources doivent être configurées sur votre espace **UiPath Cloud** :
+1. récupère les informations principales de l'e-mail (nom, adresse e-mail, poste recherché) ;
+2. les ajoute automatiquement dans le fichier de suivi ;
+3. enregistre le CV dans le bon dossier (Google Drive) ;
+4. envoie automatiquement un message de confirmation.
 
-### 1. Connexion Gmail (Integration Service)
-1. Rendez-vous dans **Integration Service** > **Connectors** > **Gmail**.
-2. Créez et authentifiez la connexion avec le compte cible (ex. : `scoeric3@gmail.com`).
-3. Vérifiez que le statut de la connexion est actif (*Connected*).
+La personne chargée du recrutement garde la partie qui compte : lire le CV et décider si le profil mérite d'être approfondi. Une page **Streamlit** permet de visualiser l'ensemble des candidatures.
 
-### 2. Création du Storage Bucket (Orchestrator)
-1. Rendez-vous dans **Orchestrator** et sélectionnez votre dossier de travail (*Folder*).
-2. Allez dans l'onglet **Storage Buckets** > **Add Storage Bucket**.
-3. Sélectionnez **Orchestrator** comme fournisseur de stockage.
-4. Nommez le bucket exactement : **`CV_Candidates`**.
+- **Déclencheur** : réception d'un e-mail
+- **Applications** : boîte e-mail de test · fichier de suivi · dossier de stockage
+- **Outil** : UiPath Studio Web
 
----
+**Pourquoi cette tâche est idéale à automatiser :**
 
-## 🔄 Détail du Workflow (UiPath Studio)
+- un processus répétitif, presque identique d'une candidature à l'autre ;
+- des données déjà numériques (e-mails et CV), sans ressaisie nécessaire ;
+- l'humain se concentre sur ce qu'il fait le mieux : analyser et décider.
 
-### Étape 1 : Lecture des e-mails (`For Each Email`)
-* **Connexion** : Connecteur Gmail configuré dans Integration Service.
-* **Filtre** : Recherche des e-mails non lus ou contenant des pièces jointes (ex. : sujet contenant `"Candidature"` ou `"CV"`).
-* **Variable d'itération** : `CurrentEmail`.
+![La solution CandiBot](assets/slide-05-solution.png)
 
-### Étape 2 : Téléchargement temporaire (`Download Email Attachments`)
-* **Email message** : `CurrentEmail`
-* **Filter by filename** : `"*.pdf"` *(ignore les images de signature ou autres formats non désirés)*.
-* **Options > Exclude inline attachments** : `False` *(ou `True` pour ignorer les logos intégrés dans le corps du mail)*.
-* **Options > Destination path** :
-  ```vbnet
-  System.IO.Path.GetTempPath()
-  ```
-* **Options > If a file already exists** : `Replace`
-* **Output > Attachments** : `Attachments` *(Liste de type `IEnumerable<GmailAttachmentLocalItem>`)*.
+## 4. Démonstration du prototype
 
-### Étape 3 : Vérification et Téléversement Cloud (`Upload Storage File`)
-*(Condition recommandée : `Attachments IsNot Nothing AndAlso Attachments.Count > 0`)*
-* **Storage bucket name** : `"CV_Candidates"`
-* **File** :
-  ```vbnet
-  Attachments(0).LocalPath
-  ```
-* **Destination path** : *(Laisser vide pour enregistrer à la racine du bucket)*
-* **Uploaded file name** :
-  ```vbnet
-  CurrentEmail.From.Address + "_" + Attachments(0).Name
-  ```
+### Étape 1 : postuler via le formulaire en ligne
 
----
+Le candidat renseigne son nom complet, son adresse e-mail, le poste souhaité et son CV (PDF, 5 Mo maximum) sur [e-telecom-soft.com](https://e-telecom-soft.com/).
 
-## 📂 Structure du projet
+![Formulaire de candidature](assets/formulaire-candidature.png)
 
-```text
-CandiBot/
-├── Main.xaml                 # Point d'entrée principal du workflow
-├── project.json              # Configuration des dépendances et métadonnées UiPath
-├── .entities/                # Définitions des objets Integration Service
-└── README.md                 # Documentation complète du projet
+### Étape 2 : suivre les candidatures dans le dashboard Streamlit
+
+Le dashboard lit les données enregistrées dans le fichier de suivi (Google Sheet) et propose :
+
+- la recherche d'un CV par nom ;
+- le flux du pipeline par étape ;
+- des indicateurs : total des candidatures, en attente, traitées, postes distincts ;
+- des filtres par statut et par poste ;
+- une actualisation manuelle ou automatique.
+
+![Dashboard Streamlit](assets/dashboard-streamlit.png)
+
+## 5. Bénéfices attendus
+
+Au-delà du temps gagné, CandiBot fiabilise chaque étape du traitement.
+
+| Bénéfice | Détail |
+|---|---|
+| Gagner du temps | Sur les tâches répétitives de saisie et de classement |
+| Réduire les erreurs | Moins de mauvaises adresses ou de fichiers mal nommés |
+| Mieux classer les CV | Chaque CV rangé au bon endroit, sans oubli |
+| Répondre plus vite | Une confirmation envoyée dès la réception |
+| Un suivi à jour | Le fichier de suivi reflète toujours la réalité |
+| Plus de temps d'analyse | Le recruteur se concentre sur les profils |
+
+![Bénéfices attendus](assets/slide-09-benefices.png)
+
+## 6. Cas d'intervention humaine
+
+Le robot ne gère pas tout seul. Une personne reprend la main dans les situations suivantes, afin qu'aucune candidature ne soit mal traitée :
+
+| Situation | Conséquence |
+|---|---|
+| Le CV est absent | Aucun fichier à traiter, rien à classer |
+| Le nom n'est pas indiqué | Impossible d'identifier le candidat |
+| Le poste n'est pas précisé | Le suivi ne peut pas être complété |
+| Le fichier joint ne fonctionne pas | Format illisible ou corrompu |
+| Le robot rencontre une erreur | Vérification manuelle nécessaire |
+| Analyse réelle du profil | Reste toujours du ressort du recruteur |
+
+![Cas d'intervention humaine](assets/slide-10-limites.png)
+
+## 7. Prototype et ressources
+
+Le prototype est une version simple du processus, réalisée pour valider l'approche avant d'aller plus loin.
+
+**Ce que fait le prototype :**
+
+- utiliser un e-mail de candidature de test ;
+- récupérer le nom, l'e-mail et le poste recherché ;
+- ajouter les informations dans le fichier de suivi ;
+- enregistrer le CV dans un dossier ;
+- afficher un message de fin de traitement.
+
+**Ressources :**
+
+- **Équipe** : une personne pour le besoin métier, une pour le prototype, une pour le diagramme et le PowerPoint ;
+- **Outils** : UiPath Studio Web, une boîte e-mail de test, un fichier de suivi, un dossier de stockage ;
+- **Données de test** : des CV fictifs et un dossier pour les enregistrer.
+
+> Hors périmètre du prototype : le robot ne gère pas tous les cas possibles. Seules certaines parties du processus sont développées.
+
+![Prototype et ressources](assets/slide-11-prototype.png)
+
+## 8. Planning et ROI
+
+**Hypothèse : 100 candidatures reçues par mois.**
+
+**Planning :**
+
+1. Définir le problème et le fonctionnement actuel
+2. Préparer un e-mail, un CV et un fichier de suivi de test
+3. Créer le prototype avec UiPath
+4. Tester le robot et corriger les erreurs
+5. Réaliser le diagramme et la présentation
+6. Vérifier l'ensemble du projet avant l'envoi
+
+**Temps de traitement par candidature :** 5 min en manuel contre 0,5 min avec CandiBot.
+
+| Indicateur | Valeur |
+|---|---|
+| Temps gagné | 7 h 30 / mois |
+| Économies | ~2 250 € / an |
+| ROI estimé | 181,25 % |
+| Amortissement du coût initial | ~3 mois |
+
+Coût de création : 500 € · maintenance : ~25 €/mois · coût total année 1 : ~800 €. Gain net estimé la première année : ~1 450 €. Le coût initial de 500 € est amorti en ~3 mois.
+
+> Ces chiffres sont des estimations utilisées uniquement dans le cadre du projet.
+
+![Planning et ROI](assets/slide-12-planning-roi.png)
+
+## 9. Lancer le dashboard
+
+Le dashboard Streamlit lit les données du fichier de suivi (projet `candibot dashbord`). Depuis le dossier du projet :
+
+```bash
+streamlit run app.py
 ```
 
----
+L'application est ensuite disponible sur <http://localhost:8501>.
 
-## 🚀 Déploiement et exécution
+## 10. Liens utiles
 
-1. **Publication** : Depuis UiPath Studio, cliquez sur **Publish** pour envoyer le package NuGet vers le flux **Orchestrator Tenant Processes Feed**.
-2. **Création du processus** : Dans Orchestrator (**Automations** > **Processes**), créez un processus lié au package `CandiBot`.
-3. **Exécution** :
-   * **Manuelle** : Lancez le job depuis Orchestrator en sélectionnant un robot *Cloud Serverless*.
-   * **Planifiée (Trigger)** : Configurez un déclencheur horaire (ex. : toutes les 30 minutes) ou événementiel (à la réception d'un e-mail via Integration Service).
+- Formulaire de candidature : <https://e-telecom-soft.com/>
+- [Fichier de suivi des candidatures (Google Sheets)](https://docs.google.com/spreadsheets/d/1XCmiAU6BNcPe7IN2KXMVziPHHXxINVpQF0UAP83z42Y/edit?usp=drive_link)
+- [Dossier de dépôt des CV (Google Drive)](https://drive.google.com/drive/u/0/folders/1mY0eP-OizQY4ltrKBTddfDuobw8AOSiA)
 
 ---
 
-## 🛡️ Gestion des erreurs et bonnes pratiques
-
-* **Absence de chemin local en dur** : L'utilisation de `System.IO.Path.GetTempPath()` garantit que le robot ne rencontrera jamais d'erreur `GSuiteException: The specified path does not exist` lors de son exécution sur les serveurs Cloud d'UiPath.
-* **Nettoyage automatique** : Les conteneurs Cloud étant éphémères, les fichiers temporaires sont automatiquement purgés à la fin du job, garantissant la conformité RGPD et la sécurité des données.
-* **Gestion multi-pièces jointes** : Si un candidat envoie plusieurs PDF (CV + Lettre de motivation), il est recommandé d'encapsuler l'activité `Upload Storage File` dans une boucle `For Each` sur la collection `Attachments`.
-
----
-
-## 🔮 Évolutions futures (Roadmap)
-
-* [ ] **Extraction de données par IA (Document Understanding / GenAI)** : Parser automatiquement le contenu des PDF (nom, compétences, années d'expérience) pour structurer un fichier JSON/CSV.
-* [ ] **Alimentation d'un Data Warehouse / Base de données** : Injecter les métadonnées des candidats dans une table SQL ou BigQuery pour alimenter un tableau de bord Power BI RH.
-* [ ] **Notification automatique** : Envoyer un accusé de réception personnalisé au candidat et notifier l'équipe recrutement sur Slack/Teams.
-
----
-
-## 👤 Auteur
-
-**Kossi Eric DONYOH**  
-*Data Analyst & Intégrateur de Systèmes d'Information (RPA / Data / IA)*
+*Projet RPA · MBA ESG Paris · Septembre 2026*
